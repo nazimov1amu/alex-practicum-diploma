@@ -1,6 +1,9 @@
 package repositories
 
 import (
+	"database/sql"
+
+	"github.com/georgysavva/scany/v2/sqlscan"
 	"github.com/google/uuid"
 )
 
@@ -18,9 +21,9 @@ func nullUUID(value uuid.UUID) *uuid.UUID {
 	return &value
 }
 
-func nullFloat64(value float64) *float64 {
-	if value == 0 {
-		return nil
+func DBorTx(db *sql.DB, tx *sql.Tx) sqlscan.Querier {
+	if tx != nil {
+		return tx
 	}
-	return &value
+	return db
 }

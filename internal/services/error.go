@@ -11,19 +11,20 @@ import (
 )
 
 const (
-	InternalServerError = "internal_server_error"
+	notFoundPostfix = "_not_found"
+	conflictPostfix = "_already_exists"
 )
 
-func mapRepositoryError(logger *zap.SugaredLogger, err error, message string) error {
+func mapRepositoryError(logger *zap.SugaredLogger, err error, entity_name string) error {
 	if errors.Is(err, sql.ErrNoRows) {
-		return apperrors.NotFound(message)
+		return apperrors.NotFound(entity_name + notFoundPostfix)
 	}
 
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == resources.UniqueViolation {
-		return apperrors.Conflict(message)
+		return apperrors.Conflict(entity_name + conflictPostfix)
 	}
 
 	logger.Errorw("database", "error", err)
-	return apperrors.Internal(InternalServerError)
+	return apperrors.Internal("internal_server_error")
 }

@@ -11,6 +11,12 @@ const (
 	KindForbidden
 	KindConflict
 	KindInternal
+	KindValidationError
+)
+
+const (
+	InvalidAccessToken  = "invalid_access_token"
+	InternalServerError = "internal_server_error"
 )
 
 type AppError struct {
@@ -34,12 +40,13 @@ func (e *AppError) Is(target error) bool {
 }
 
 var (
-	ErrNotFound     = &AppError{Kind: KindNotFound}
-	ErrBadRequest   = &AppError{Kind: KindBadRequest}
-	ErrUnauthorized = &AppError{Kind: KindUnauthorized}
-	ErrForbidden    = &AppError{Kind: KindForbidden}
-	ErrConflict     = &AppError{Kind: KindConflict}
-	ErrInternal     = &AppError{Kind: KindInternal}
+	ErrNotFound        = &AppError{Kind: KindNotFound}
+	ErrBadRequest      = &AppError{Kind: KindBadRequest}
+	ErrUnauthorized    = &AppError{Kind: KindUnauthorized}
+	ErrForbidden       = &AppError{Kind: KindForbidden}
+	ErrConflict        = &AppError{Kind: KindConflict}
+	ErrInternal        = &AppError{Kind: KindInternal}
+	ErrValidationError = &AppError{Kind: KindValidationError}
 )
 
 func NotFound(message string) error {
@@ -60,6 +67,10 @@ func Forbidden(message string) error {
 
 func Conflict(message string) error {
 	return &AppError{Kind: KindConflict, Message: message}
+}
+
+func ValidationError(message string) error {
+	return &AppError{Kind: KindValidationError, Message: message}
 }
 
 func Internal(message string) error {

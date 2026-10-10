@@ -60,6 +60,22 @@ func (r *UserRepository) GetByLogin(ctx context.Context, login string) (models.U
 	return user, err
 }
 
+func (r *UserRepository) GetBalance(ctx context.Context, userID uuid.UUID) (models.UserBalance, error) {
+	const q = `
+		SELECT
+			u.balance AS current,
+			COALESCE(SUM(e.amount) FILTER (WHERE e.event_type = 'withdrawal'), 0) AS withdrawn
+		FROM users u
+		LEFT JOIN events e ON e.user_id = u.id
+		WHERE u.id = $1
+		GROUP BY u.id, u.balance
+	`
+
+	var balance models.UserBalance
+	err := sqlscan.Get(ctx, r.db, &balance, q, userID)
+	return balance, err
+}
+
 func (r *UserRepository) AddBalance(ctx context.Context, tx *sql.Tx, userID uuid.UUID, delta float64) error {
 	const q = `
 		UPDATE users
@@ -70,7 +86,7 @@ func (r *UserRepository) AddBalance(ctx context.Context, tx *sql.Tx, userID uuid
 	`
 
 	var id uuid.UUID
-	err := sqlscan.Get(ctx, tx, &id, q, userID, delta)
+	err := sqlscan.Get(ctx, DBorTx(r.db, tx), &id, q, userID, delta)
 	if err == nil {
 		return nil
 	}
@@ -83,46 +99,9 @@ func (r *UserRepository) AddBalance(ctx context.Context, tx *sql.Tx, userID uuid
 		FROM users
 		WHERE id = $1
 	`
-	err = sqlscan.Get(ctx, tx, &id, existsQ, userID)
+	err = sqlscan.Get(ctx, DBorTx(r.db, tx), &id, existsQ, userID)
 	if err != nil {
 		return err
 	}
 	return ErrInsufficientBalance
-}
-
-func (r *UserRepository) Update(ctx context.Context, tx *sql.Tx, user models.User) (models.User, error) {
-	const q = `
-		WITH updated AS (
-			UPDATE users
-			SET login = COALESCE($2, login),
-				password = COALESCE($3, password)
-				balance = COALESCE($4, balance)
-			WHERE id = $1
-			RETURNING id, login, password, balance
-		)
-		SELECT id, login, password, balance
-		FROM updated
-	`
-
-	var updated models.User
-	err := sqlscan.Get(ctx, tx, &updated, q, user.ID, nullString(user.Login), nullString(user.Password), user.Balance)
-	return updated, err
-}
-
-func (r *UserRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	const q = `DELETE FROM users WHERE id = $1`
-
-	result, err := r.db.ExecContext(ctx, q, id)
-	if err != nil {
-		return err
-	}
-
-	affected, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if affected == 0 {
-		return sql.ErrNoRows
-	}
-	return nil
 }

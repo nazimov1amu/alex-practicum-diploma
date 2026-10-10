@@ -10,15 +10,11 @@ import (
 	"go.uber.org/zap"
 )
 
-const (
-	NotFoundEvent       = "not_found_event"
-	InsufficientBalance = "insufficient_balance"
-)
-
 type EventService struct {
 	db     *sql.DB
 	events *repositories.EventRepository
 	user   *repositories.UserRepository
+	order  *repositories.OrderRepository
 	logger *zap.SugaredLogger
 }
 
@@ -27,6 +23,7 @@ func NewEventService(db *sql.DB, logger *zap.SugaredLogger) *EventService {
 		db:     db,
 		events: repositories.NewEventRepository(db),
 		user:   repositories.NewUserRepository(db),
+		order:  repositories.NewOrderRepository(db),
 		logger: logger,
 	}
 }
@@ -34,34 +31,52 @@ func NewEventService(db *sql.DB, logger *zap.SugaredLogger) *EventService {
 func (s *EventService) Create(ctx context.Context, event models.Event) (models.Event, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		return models.Event{}, mapRepositoryError(s.logger, err, InternalServerError)
+		return models.Event{}, mapRepositoryError(s.logger, err, "event")
 	}
 	defer tx.Rollback()
 	user, err := s.user.GetByID(ctx, event.UserID)
 	if err != nil {
-		return models.Event{}, mapRepositoryError(s.logger, err, NotFoundUser)
+		return models.Event{}, mapRepositoryError(s.logger, err, "user")
+	}
+
+	if event.EventType == models.EventTypeWithdrawal {
+		order, err := s.order.GetByOrderNumber(ctx, event.OrderNumber)
+		if err != nil {
+			return models.Event{}, mapRepositoryError(s.logger, err, "order")
+		}
+		if order.UserID != user.ID {
+			return models.Event{}, mapRepositoryError(s.logger, err, "order")
+		}
 	}
 
 	delta := eventDelta(event)
 
 	if user.Balance < delta {
-		return models.Event{}, mapRepositoryError(s.logger, err, InsufficientBalance)
+		return models.Event{}, mapRepositoryError(s.logger, err, "user")
 	}
 
 	err = s.user.AddBalance(ctx, tx, event.UserID, delta)
 	if err != nil {
-		return models.Event{}, mapRepositoryError(s.logger, err, NotFoundUser)
+		return models.Event{}, mapRepositoryError(s.logger, err, "user")
 	}
 
 	created, err := s.events.Create(ctx, tx, event)
 	if err != nil {
-		return models.Event{}, mapRepositoryError(s.logger, err, NotFoundEvent)
+		return models.Event{}, mapRepositoryError(s.logger, err, "event")
 	}
 
 	if err := tx.Commit(); err != nil {
-		return models.Event{}, mapRepositoryError(s.logger, err, InternalServerError)
+		return models.Event{}, mapRepositoryError(s.logger, err, "event")
 	}
 	return created, nil
+}
+
+func (s *EventService) ListWithdrawals(ctx context.Context, userID uuid.UUID) ([]models.Event, error) {
+	events, err := s.events.ListWithdrawalsByUserID(ctx, userID)
+	if err != nil {
+		return nil, mapRepositoryError(s.logger, err, "event")
+	}
+	return events, nil
 }
 
 func eventDelta(event models.Event) float64 {
@@ -69,65 +84,4 @@ func eventDelta(event models.Event) float64 {
 		return -event.Amount
 	}
 	return event.Amount
-}
-
-func (s *EventService) GetByID(ctx context.Context, id uuid.UUID) (models.Event, error) {
-	event, err := s.events.GetByID(ctx, id)
-	if err != nil {
-		return models.Event{}, mapRepositoryError(s.logger, err, NotFoundEvent)
-	}
-	return event, nil
-}
-
-func (s *EventService) ListByUserID(ctx context.Context, userID uuid.UUID) ([]models.Event, error) {
-	events, err := s.events.ListByUserID(ctx, userID)
-	if err != nil {
-		return nil, mapRepositoryError(s.logger, err, NotFoundEvent)
-	}
-	return events, nil
-}
-
-func (s *EventService) Update(ctx context.Context, event models.Event) (models.Event, error) {
-	oldEvent, err := s.events.GetByID(ctx, event.ID)
-	if err != nil {
-		return models.Event{}, mapRepositoryError(s.logger, err, NotFoundEvent)
-	}
-
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return models.Event{}, mapRepositoryError(s.logger, err, InternalServerError)
-	}
-	defer tx.Rollback()
-
-	user, err := s.user.GetByID(ctx, oldEvent.UserID)
-	if err != nil {
-		return models.Event{}, mapRepositoryError(s.logger, err, NotFoundUser)
-	}
-
-	delta := eventDelta(event) - eventDelta(oldEvent)
-	if user.Balance < delta {
-		return models.Event{}, mapRepositoryError(s.logger, err, InsufficientBalance)
-	}
-
-	err = s.user.AddBalance(ctx, tx, oldEvent.UserID, delta)
-	if err != nil {
-		return models.Event{}, mapRepositoryError(s.logger, err, NotFoundUser)
-	}
-
-	updated, err := s.events.Update(ctx, tx, event)
-	if err != nil {
-		return models.Event{}, mapRepositoryError(s.logger, err, NotFoundEvent)
-	}
-
-	if err := tx.Commit(); err != nil {
-		return models.Event{}, mapRepositoryError(s.logger, err, InternalServerError)
-	}
-	return updated, nil
-}
-
-func (s *EventService) Delete(ctx context.Context, id uuid.UUID) error {
-	if err := s.events.Delete(ctx, id); err != nil {
-		return mapRepositoryError(s.logger, err, NotFoundEvent)
-	}
-	return nil
 }

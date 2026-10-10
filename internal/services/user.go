@@ -32,7 +32,6 @@ type TokenPair struct {
 const (
 	InvalidCredentials  = "invalid_credentials"
 	InvalidRefreshToken = "invalid_refresh_token"
-	NotFoundUser        = "not_found_user"
 )
 
 func NewUserService(db *sql.DB, logger *zap.SugaredLogger) *UserService {
@@ -50,12 +49,12 @@ func (s *UserService) Register(ctx context.Context, login, password string) (Tok
 	hash, err := s.hashPassword(password)
 	if err != nil {
 		s.logger.Errorw("hash password", "error", err)
-		return TokenPair{}, apperrors.Internal(InternalServerError)
+		return TokenPair{}, apperrors.Internal(apperrors.InternalServerError)
 	}
 
 	created, err := s.users.Create(ctx, models.User{Login: login, Password: hash})
 	if err != nil {
-		return TokenPair{}, mapRepositoryError(s.logger, err, NotFoundUser)
+		return TokenPair{}, mapRepositoryError(s.logger, err, "user")
 	}
 
 	return s.tokenPair(created.ID)
@@ -71,7 +70,7 @@ func (s *UserService) Login(ctx context.Context, login, password string) (TokenP
 		if errors.Is(err, sql.ErrNoRows) {
 			return TokenPair{}, apperrors.Unauthorized(InvalidCredentials)
 		}
-		return TokenPair{}, mapRepositoryError(s.logger, err, NotFoundUser)
+		return TokenPair{}, mapRepositoryError(s.logger, err, "user")
 	}
 
 	if !s.verifyPassword(user.Password, password) {
@@ -91,70 +90,32 @@ func (s *UserService) Refresh(ctx context.Context, refreshToken string) (TokenPa
 		if errors.Is(err, sql.ErrNoRows) {
 			return TokenPair{}, apperrors.Unauthorized(InvalidRefreshToken)
 		}
-		return TokenPair{}, mapRepositoryError(s.logger, err, NotFoundUser)
+		return TokenPair{}, mapRepositoryError(s.logger, err, "user")
 	}
 
 	return s.tokenPair(userID)
 }
 
-func (s *UserService) Create(ctx context.Context, user models.User) (models.User, error) {
-	hash, err := s.hashPassword(user.Password)
+func (s *UserService) GetBalance(ctx context.Context, userID uuid.UUID) (models.UserBalance, error) {
+	balance, err := s.users.GetBalance(ctx, userID)
 	if err != nil {
-		s.logger.Errorw("hash password", "error", err)
-		return models.User{}, apperrors.Internal(InternalServerError)
-	}
-	user.Password = hash
-
-	created, err := s.users.Create(ctx, user)
-	if err != nil {
-		return models.User{}, mapRepositoryError(s.logger, err, NotFoundUser)
-	}
-	return created, nil
-}
-
-func (s *UserService) GetByID(ctx context.Context, id uuid.UUID) (models.User, error) {
-	user, err := s.users.GetByID(ctx, id)
-	if err != nil {
-		return models.User{}, mapRepositoryError(s.logger, err, NotFoundUser)
-	}
-	return user, nil
-}
-
-func (s *UserService) Update(ctx context.Context, user models.User) (models.User, error) {
-	if user.Password != "" {
-		hash, err := s.hashPassword(user.Password)
-		if err != nil {
-			s.logger.Errorw("hash password", "error", err)
-			return models.User{}, apperrors.Internal(InternalServerError)
-		}
-		user.Password = hash
+		return models.UserBalance{}, mapRepositoryError(s.logger, err, "user")
 	}
 
-	updated, err := s.users.Update(ctx, user)
-	if err != nil {
-		return models.User{}, mapRepositoryError(s.logger, err, NotFoundUser)
-	}
-	return updated, nil
-}
-
-func (s *UserService) Delete(ctx context.Context, id uuid.UUID) error {
-	if err := s.users.Delete(ctx, id); err != nil {
-		return mapRepositoryError(s.logger, err, NotFoundUser)
-	}
-	return nil
+	return balance, nil
 }
 
 func (s *UserService) tokenPair(userID uuid.UUID) (TokenPair, error) {
 	access, err := common.Sign(userID, common.TokenTypeAccess, resources.AccessTTL)
 	if err != nil {
 		s.logger.Errorw("sign access token", "error", err)
-		return TokenPair{}, apperrors.Internal(InternalServerError)
+		return TokenPair{}, apperrors.Internal(apperrors.InternalServerError)
 	}
 
 	refresh, err := common.Sign(userID, common.TokenTypeRefresh, resources.RefreshTTL)
 	if err != nil {
 		s.logger.Errorw("sign refresh token", "error", err)
-		return TokenPair{}, apperrors.Internal(InternalServerError)
+		return TokenPair{}, apperrors.Internal(apperrors.InternalServerError)
 	}
 
 	return TokenPair{AccessToken: access, RefreshToken: refresh}, nil

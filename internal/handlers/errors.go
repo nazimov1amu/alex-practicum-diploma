@@ -6,13 +6,12 @@ import (
 
 	"github.com/labstack/echo/v5"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/apperrors"
-	"github.com/nazimov1amu/alex-practicum-diploma/internal/resources"
 )
 
 func mapAppError(err error) error {
 	var appErr *apperrors.AppError
 	if !errors.As(err, &appErr) {
-		return echo.NewHTTPError(http.StatusInternalServerError, resources.InternalServerError)
+		return echo.NewHTTPError(http.StatusInternalServerError, apperrors.InternalServerError)
 	}
 
 	status := http.StatusInternalServerError
@@ -33,7 +32,7 @@ func mapAppError(err error) error {
 
 	message := appErr.Message
 	if message == "" {
-		message = resources.InternalServerError
+		message = apperrors.InternalServerError
 	}
 	return echo.NewHTTPError(status, message)
 }

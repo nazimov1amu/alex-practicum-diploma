@@ -11,7 +11,9 @@ import (
 	"github.com/labstack/echo/v5"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/config"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/db"
+	"github.com/nazimov1amu/alex-practicum-diploma/internal/handlers"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/routes"
+	"github.com/nazimov1amu/alex-practicum-diploma/internal/services"
 	"go.uber.org/zap"
 )
 
@@ -52,9 +54,11 @@ func NewApp() (*App, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &App{
-		logger:  sugar,
-		db:      database,
-		echo:    routes.Router(nil),
+		logger: sugar,
+		db:     database,
+		echo: routes.Router([]routes.Handler{
+			handlers.NewUserHandler(services.NewUserService(database, sugar)),
+		}),
 		address: address,
 		ctx:     ctx,
 		cancel:  cancel,

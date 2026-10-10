@@ -62,7 +62,7 @@ func UserIDFromToken(tokenString, tokenType string) (uuid.UUID, error) {
 func UserIDFromContext(c *echo.Context) (uuid.UUID, error) {
 	userID, _ := c.Get(resources.UserIDKey).(uuid.UUID)
 	if userID == uuid.Nil {
-		return uuid.Nil, apperrors.Unauthorized(resources.InvalidAccessToken)
+		return uuid.Nil, apperrors.Unauthorized(apperrors.InvalidAccessToken)
 	}
 	return userID, nil
 }
