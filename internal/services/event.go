@@ -16,16 +16,26 @@ const insufficientBalance = "insufficient_balance"
 
 type EventService struct {
 	db     *sql.DB
-	events *repositories.EventRepository
-	user   *repositories.UserRepository
+	events eventStore
+	user   userBalanceStore
 	logger *zap.SugaredLogger
 }
 
-func NewEventService(db *sql.DB, logger *zap.SugaredLogger) *EventService {
+type eventStore interface {
+	Create(ctx context.Context, tx *sql.Tx, event models.Event) (models.Event, error)
+	ListWithdrawalsByUserID(ctx context.Context, userID uuid.UUID) ([]models.Event, error)
+}
+
+type userBalanceStore interface {
+	GetByID(ctx context.Context, id uuid.UUID) (models.User, error)
+	AddBalance(ctx context.Context, tx *sql.Tx, userID uuid.UUID, delta float64) error
+}
+
+func NewEventService(db *sql.DB, logger *zap.SugaredLogger, events eventStore, user userBalanceStore) *EventService {
 	return &EventService{
 		db:     db,
-		events: repositories.NewEventRepository(db),
-		user:   repositories.NewUserRepository(db),
+		events: events,
+		user:   user,
 		logger: logger,
 	}
 }

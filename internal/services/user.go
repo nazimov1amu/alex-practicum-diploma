@@ -13,14 +13,13 @@ import (
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/apperrors"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/common"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/models"
-	"github.com/nazimov1amu/alex-practicum-diploma/internal/repositories"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/resources"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/argon2"
 )
 
 type UserService struct {
-	users  *repositories.UserRepository
+	users  userStore
 	logger *zap.SugaredLogger
 }
 
@@ -34,9 +33,16 @@ const (
 	InvalidRefreshToken = "invalid_refresh_token"
 )
 
-func NewUserService(db *sql.DB, logger *zap.SugaredLogger) *UserService {
+type userStore interface {
+	Create(ctx context.Context, user models.User) (models.User, error)
+	GetByLogin(ctx context.Context, login string) (models.User, error)
+	GetByID(ctx context.Context, id uuid.UUID) (models.User, error)
+	GetBalance(ctx context.Context, userID uuid.UUID) (models.UserBalance, error)
+}
+
+func NewUserService(db *sql.DB, logger *zap.SugaredLogger, users userStore) *UserService {
 	return &UserService{
-		users:  repositories.NewUserRepository(db),
+		users:  users,
 		logger: logger,
 	}
 }

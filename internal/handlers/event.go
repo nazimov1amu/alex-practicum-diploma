@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/common"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/dto"
@@ -11,8 +13,13 @@ import (
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/services"
 )
 
+type eventService interface {
+	Create(ctx context.Context, event models.Event) (models.Event, error)
+	ListWithdrawals(ctx context.Context, userID uuid.UUID) ([]models.Event, error)
+}
+
 type EventHandler struct {
-	events *services.EventService
+	events eventService
 }
 
 func NewEventHandler(events *services.EventService) *EventHandler {

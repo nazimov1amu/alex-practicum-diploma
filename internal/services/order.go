@@ -8,7 +8,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/apperrors"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/models"
-	"github.com/nazimov1amu/alex-practicum-diploma/internal/repositories"
 	"go.uber.org/zap"
 )
 
@@ -18,13 +17,19 @@ const (
 )
 
 type OrderService struct {
-	orders *repositories.OrderRepository
+	orders orderStore
 	logger *zap.SugaredLogger
 }
 
-func NewOrderService(db *sql.DB, logger *zap.SugaredLogger) *OrderService {
+type orderStore interface {
+	Create(ctx context.Context, order models.Order) (models.Order, error)
+	ListByUserID(ctx context.Context, userID uuid.UUID) ([]models.Order, error)
+	GetByOrderNumber(ctx context.Context, orderNumber string) (models.Order, error)
+}
+
+func NewOrderService(db *sql.DB, logger *zap.SugaredLogger, orders orderStore) *OrderService {
 	return &OrderService{
-		orders: repositories.NewOrderRepository(db),
+		orders: orders,
 		logger: logger,
 	}
 }

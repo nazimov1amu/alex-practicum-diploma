@@ -14,6 +14,9 @@ type Handler interface {
 func Router(handlers []Handler) *echo.Echo {
 	e := echo.New()
 	e.Use(middleware.RequestLogger())
+	e.Use(middleware.Recover())
+	e.Use(middleware.Decompress())
+	e.Use(middleware.Gzip())
 
 	api := e.Group("/api")
 	api.GET("/health", func(c *echo.Context) error {

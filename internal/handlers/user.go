@@ -1,19 +1,29 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/common"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/dto"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/middleware"
+	"github.com/nazimov1amu/alex-practicum-diploma/internal/models"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/services"
 )
 
 const invalidRequestBody = "invalid_request_body"
 
+type userService interface {
+	Register(ctx context.Context, login, password string) (services.TokenPair, error)
+	Login(ctx context.Context, login, password string) (services.TokenPair, error)
+	Refresh(ctx context.Context, refreshToken string) (services.TokenPair, error)
+	GetBalance(ctx context.Context, userID uuid.UUID) (models.UserBalance, error)
+}
+
 type UserHandler struct {
-	users *services.UserService
+	users userService
 }
 
 func NewUserHandler(users *services.UserService) *UserHandler {

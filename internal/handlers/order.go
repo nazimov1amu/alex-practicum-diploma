@@ -1,11 +1,13 @@
 package handlers
 
 import (
+	"context"
 	"errors"
 	"io"
 	"net/http"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/apperrors"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/common"
@@ -15,8 +17,14 @@ import (
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/services"
 )
 
+type orderService interface {
+	Create(ctx context.Context, order models.Order) (models.Order, error)
+	List(ctx context.Context, userID uuid.UUID) ([]models.Order, error)
+	GetByOrderNumber(ctx context.Context, orderNumber string) (models.Order, error)
+}
+
 type OrderHandler struct {
-	orders *services.OrderService
+	orders orderService
 }
 
 func NewOrderHandler(orders *services.OrderService) *OrderHandler {

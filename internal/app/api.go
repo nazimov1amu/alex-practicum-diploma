@@ -12,6 +12,7 @@ import (
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/config"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/db"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/handlers"
+	"github.com/nazimov1amu/alex-practicum-diploma/internal/repositories"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/services"
 	"go.uber.org/zap"
 )
@@ -50,14 +51,20 @@ func NewApp() (*App, error) {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
+	userStore := repositories.NewUserRepository(database)
+	orderStore := repositories.NewOrderRepository(database)
+	eventStore := repositories.NewEventRepository(database)
+	userService := services.NewUserService(database, sugar, userStore)
+	orderService := services.NewOrderService(database, sugar, orderStore)
+	eventService := services.NewEventService(database, sugar, eventStore, userStore)
 
 	return &App{
 		logger: sugar,
 		db:     database,
 		echo: handlers.Router([]handlers.Handler{
-			handlers.NewUserHandler(services.NewUserService(database, sugar)),
-			handlers.NewOrderHandler(services.NewOrderService(database, sugar)),
-			handlers.NewEventHandler(services.NewEventService(database, sugar)),
+			handlers.NewUserHandler(userService),
+			handlers.NewOrderHandler(orderService),
+			handlers.NewEventHandler(eventService),
 		}),
 		address: address,
 		ctx:     ctx,
