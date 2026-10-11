@@ -63,8 +63,8 @@ func (r *OrderRepository) ListPending(ctx context.Context) ([]models.Order, erro
 func (r *OrderRepository) ApplyAccrual(ctx context.Context, tx *sql.Tx, number, status string, accrual float64) (uuid.UUID, bool, error) {
 	const q = `
 		UPDATE orders
-		SET status = $2,
-		    accrual = CASE WHEN $2 IN ('PROCESSED', 'INVALID') THEN $3 ELSE accrual END,
+		SET status = $2::varchar,
+		    accrual = CASE WHEN $2::varchar IN ('PROCESSED', 'INVALID') THEN $3::numeric ELSE accrual END,
 		    updated_at = NOW()
 		WHERE order_number = $1
 		  AND status NOT IN ('PROCESSED', 'INVALID')

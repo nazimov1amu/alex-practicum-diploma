@@ -66,7 +66,6 @@ func (w *SyncWorker) Run(ctx context.Context) {
 	ticker := time.NewTicker(accrualPollInterval)
 	defer ticker.Stop()
 
-	w.tick(ctx)
 	for {
 		select {
 		case <-ctx.Done():
