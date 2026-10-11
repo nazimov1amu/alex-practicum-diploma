@@ -1,6 +1,7 @@
 package config
 
 import (
+	"flag"
 	"fmt"
 	"os"
 
@@ -8,29 +9,42 @@ import (
 )
 
 type AppConfig struct {
-	Address     string
-	DatabaseURL string
-	JWTSecret   string
+	Address              string
+	DatabaseURL          string
+	AccrualSystemAddress string
+	JWTSecret            string
 }
 
 func NewAppConfig() (AppConfig, error) {
-	if err := godotenv.Load(); err != nil {
-		return AppConfig{}, fmt.Errorf("load env: %w", err)
+	_ = godotenv.Load()
+
+	fs := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
+	cfg := AppConfig{
+		JWTSecret: os.Getenv("JWT_SECRET"),
+	}
+	fs.StringVar(&cfg.Address, "a", ":8080", "run address")
+	fs.StringVar(&cfg.DatabaseURL, "d", "", "database uri")
+	fs.StringVar(&cfg.AccrualSystemAddress, "r", "", "accrual system address")
+	if err := fs.Parse(os.Args[1:]); err != nil {
+		return AppConfig{}, fmt.Errorf("parse flags: %w", err)
 	}
 
-	databaseURL := os.Getenv("DATABASE_URL")
-	if databaseURL == "" {
-		return AppConfig{}, fmt.Errorf("DATABASE_URL is empty")
+	if v := os.Getenv("RUN_ADDRESS"); v != "" {
+		cfg.Address = v
+	}
+	if v := os.Getenv("DATABASE_URI"); v != "" {
+		cfg.DatabaseURL = v
+	}
+	if v := os.Getenv("ACCRUAL_SYSTEM_ADDRESS"); v != "" {
+		cfg.AccrualSystemAddress = v
 	}
 
-	jwtSecret := os.Getenv("JWT_SECRET")
-	if jwtSecret == "" {
+	if cfg.DatabaseURL == "" {
+		return AppConfig{}, fmt.Errorf("DATABASE_URI is empty")
+	}
+	if cfg.JWTSecret == "" {
 		return AppConfig{}, fmt.Errorf("JWT_SECRET is empty")
 	}
 
-	return AppConfig{
-		Address:     os.Getenv("ADDRESS"),
-		DatabaseURL: databaseURL,
-		JWTSecret:   jwtSecret,
-	}, nil
+	return cfg, nil
 }

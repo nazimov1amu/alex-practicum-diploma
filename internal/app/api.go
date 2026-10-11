@@ -45,11 +45,6 @@ func NewApp() (*App, error) {
 		return nil, err
 	}
 
-	address := cfg.Address
-	if address == "" {
-		address = ":8080"
-	}
-
 	ctx, cancel := context.WithCancel(context.Background())
 	userStore := repositories.NewUserRepository(database)
 	orderStore := repositories.NewOrderRepository(database)
@@ -66,7 +61,7 @@ func NewApp() (*App, error) {
 			handlers.NewOrderHandler(orderService),
 			handlers.NewEventHandler(eventService),
 		}),
-		address: address,
+		address: cfg.Address,
 		ctx:     ctx,
 		cancel:  cancel,
 	}, nil
