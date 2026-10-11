@@ -16,6 +16,8 @@ const (
 	OrderAlreadyExists = "order_already_exists"
 )
 
+var ErrOrderAlreadyUploaded = errors.New(OrderAlreadyExists)
+
 type OrderService struct {
 	orders orderStore
 	logger *zap.SugaredLogger
@@ -43,10 +45,10 @@ func (s *OrderService) Create(ctx context.Context, order models.Order) (models.O
 		return models.Order{}, apperrors.Conflict(OrderAlreadyExists)
 	}
 	if err == nil {
-		return existing, nil
+		return existing, ErrOrderAlreadyUploaded
 	}
 
-	order.Status = models.OrderStatusRegistered
+	order.Status = models.OrderStatusNew
 	created, err := s.orders.Create(ctx, order)
 	if err != nil {
 		return models.Order{}, mapRepositoryError(s.logger, err, "order")
@@ -60,12 +62,4 @@ func (s *OrderService) List(ctx context.Context, userID uuid.UUID) ([]models.Ord
 		return nil, mapRepositoryError(s.logger, err, "order")
 	}
 	return orders, nil
-}
-
-func (s *OrderService) GetByOrderNumber(ctx context.Context, orderNumber string) (models.Order, error) {
-	order, err := s.orders.GetByOrderNumber(ctx, orderNumber)
-	if err != nil {
-		return models.Order{}, mapRepositoryError(s.logger, err, "order")
-	}
-	return order, nil
 }

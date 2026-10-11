@@ -51,6 +51,7 @@ func TestOrderService_Create(t *testing.T) {
 		name     string
 		store    fakeOrderStore
 		want     models.Order
+		wantErr  error
 		wantKind apperrors.Kind
 		wantMsg  string
 		stored   bool
@@ -62,9 +63,10 @@ func TestOrderService_Create(t *testing.T) {
 			stored: true,
 		},
 		{
-			name:  "same user",
-			store: fakeOrderStore{existing: existing},
-			want:  existing,
+			name:    "same user",
+			store:   fakeOrderStore{existing: existing},
+			want:    existing,
+			wantErr: ErrOrderAlreadyUploaded,
 		},
 		{
 			name:     "other user",
@@ -84,10 +86,16 @@ func TestOrderService_Create(t *testing.T) {
 				assertAppError(t, err, tc.wantKind, tc.wantMsg)
 				return
 			}
+			if tc.wantErr != nil {
+				require.ErrorIs(t, err, tc.wantErr)
+				assert.Equal(t, tc.want, got)
+				assert.Zero(t, store.stored)
+				return
+			}
 			require.NoError(t, err)
 			assert.Equal(t, tc.want, got)
 			if tc.stored {
-				assert.Equal(t, models.OrderStatusRegistered, store.stored.Status)
+				assert.Equal(t, models.OrderStatusNew, store.stored.Status)
 			} else {
 				assert.Zero(t, store.stored)
 			}

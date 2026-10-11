@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,7 +10,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/apperrors"
-	"github.com/nazimov1amu/alex-practicum-diploma/internal/dto"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/models"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/resources"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/services"
@@ -20,37 +18,60 @@ import (
 )
 
 func TestOrderHandler_create(t *testing.T) {
-	h := &OrderHandler{orders: &fakeOrders{created: models.Order{
-		OrderNumber: "2377222919",
-		Status:      models.OrderStatusRegistered,
-	}}}
+	userID := uuid.New()
 
-	e := echo.New()
-	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("2377222919"))
-	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
-	c.Set(resources.UserIDKey, uuid.New())
+	tests := []struct {
+		name   string
+		body   string
+		orders *fakeOrders
+		code   int
+	}{
+		{
+			name:   "new",
+			body:   "12345678903",
+			orders: &fakeOrders{created: models.Order{OrderNumber: "2377222919"}},
+			code:   http.StatusAccepted,
+		},
+		{
+			name:   "same user",
+			body:   "12345678903",
+			orders: &fakeOrders{err: services.ErrOrderAlreadyUploaded},
+			code:   http.StatusOK,
+		},
+		{
+			name:   "other user",
+			body:   "12345678903",
+			orders: &fakeOrders{err: apperrors.Conflict(services.OrderAlreadyExists)},
+			code:   http.StatusConflict,
+		},
+		{
+			name:   "invalid number",
+			body:   "12345678902",
+			orders: &fakeOrders{},
+			code:   http.StatusUnprocessableEntity,
+		},
+	}
 
-	require.NoError(t, h.create(c))
-	assert.Equal(t, http.StatusCreated, rec.Code)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			h := &OrderHandler{orders: tc.orders}
+			e := echo.New()
+			req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(tc.body))
+			rec := httptest.NewRecorder()
+			c := e.NewContext(req, rec)
+			c.Set(resources.UserIDKey, userID)
 
-	var got dto.OrderResponse
-	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &got))
-	assert.Equal(t, "2377222919", got.Number)
-	assert.Equal(t, models.OrderStatusRegistered, got.Status)
-}
-
-func TestOrderHandler_create_Conflict(t *testing.T) {
-	h := &OrderHandler{orders: &fakeOrders{err: apperrors.Conflict(services.OrderAlreadyExists)}}
-
-	e := echo.New()
-	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("2377222919"))
-	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
-	c.Set(resources.UserIDKey, uuid.New())
-
-	require.NoError(t, h.create(c))
-	assert.Equal(t, http.StatusOK, rec.Code)
+			err := h.create(c)
+			if tc.code >= 400 {
+				var httpErr *echo.HTTPError
+				require.ErrorAs(t, err, &httpErr)
+				assert.Equal(t, tc.code, httpErr.Code)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.code, rec.Code)
+		})
+	}
 }
 
 func TestOrderHandler_list(t *testing.T) {

@@ -53,6 +53,9 @@ func NewApp() (*App, error) {
 	orderService := services.NewOrderService(database, sugar, orderStore)
 	eventService := services.NewEventService(database, sugar, eventStore, userStore)
 
+	worker := services.NewSyncWorker(cfg.AccrualSystemAddress, database, orderStore, userStore, sugar)
+	go worker.Run(ctx)
+
 	return &App{
 		logger: sugar,
 		db:     database,
@@ -68,7 +71,6 @@ func NewApp() (*App, error) {
 }
 
 func (a *App) Run() error {
-
 	sc := echo.StartConfig{
 		Address:         a.address,
 		GracefulTimeout: 10 * time.Second,

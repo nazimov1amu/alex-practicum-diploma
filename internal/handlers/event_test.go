@@ -21,7 +21,7 @@ func TestEventHandler_withdraw(t *testing.T) {
 	h := &EventHandler{events: events}
 
 	e := echo.New()
-	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"order":"2377222919","sum":50}`))
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"order":"2377225624","sum":50}`))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
@@ -30,7 +30,7 @@ func TestEventHandler_withdraw(t *testing.T) {
 	require.NoError(t, h.withdraw(c))
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Equal(t, userID, events.got.UserID)
-	assert.Equal(t, "2377222919", events.got.OrderNumber)
+	assert.Equal(t, "2377225624", events.got.OrderNumber)
 	assert.Equal(t, 50.0, events.got.Amount)
 	assert.Equal(t, models.EventTypeWithdrawal, events.got.EventType)
 }

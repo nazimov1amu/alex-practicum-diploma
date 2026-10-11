@@ -13,6 +13,9 @@ func (r WithdrawRequest) Validate() error {
 	if r.Order == "" || r.Sum <= 0 {
 		return apperrors.BadRequest(invalidRequestBody)
 	}
+	if !ValidLuhn(r.Order) {
+		return apperrors.ValidationError(invalidOrderNumber)
+	}
 	return nil
 }
 

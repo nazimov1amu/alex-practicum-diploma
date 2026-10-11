@@ -2,7 +2,6 @@ package dto
 
 import "github.com/nazimov1amu/alex-practicum-diploma/internal/apperrors"
 
-const invalidRequestBody = "invalid_request_body"
 
 type Credentials struct {
 	Login    string `json:"login"`

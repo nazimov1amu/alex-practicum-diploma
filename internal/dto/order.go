@@ -7,13 +7,20 @@ import (
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/apperrors"
 )
 
+const invalidRequestBody = "invalid_request_body"
+const invalidOrderNumber = "invalid_order_number"
+
 type UploadOrderRequest struct {
 	Number string
 }
 
 func (r UploadOrderRequest) Validate() error {
-	if strings.TrimSpace(r.Number) == "" {
+	number := strings.TrimSpace(r.Number)
+	if number == "" {
 		return apperrors.BadRequest(invalidRequestBody)
+	}
+	if !ValidLuhn(number) {
+		return apperrors.ValidationError(invalidOrderNumber)
 	}
 	return nil
 }
@@ -23,4 +30,29 @@ type OrderResponse struct {
 	Status     string    `json:"status"`
 	Accrual    *float64  `json:"accrual,omitempty"`
 	UploadedAt time.Time `json:"uploaded_at"`
+}
+
+func ValidLuhn(number string) bool {
+	if number == "" {
+		return false
+	}
+
+	sum := 0
+	double := false
+	for i := len(number) - 1; i >= 0; i-- {
+		d := number[i]
+		if d < '0' || d > '9' {
+			return false
+		}
+		n := int(d - '0')
+		if double {
+			n *= 2
+			if n > 9 {
+				n -= 9
+			}
+		}
+		sum += n
+		double = !double
+	}
+	return sum%10 == 0
 }

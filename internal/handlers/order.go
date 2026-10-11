@@ -9,7 +9,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
-	"github.com/nazimov1amu/alex-practicum-diploma/internal/apperrors"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/common"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/dto"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/middleware"
@@ -20,7 +19,6 @@ import (
 type orderService interface {
 	Create(ctx context.Context, order models.Order) (models.Order, error)
 	List(ctx context.Context, userID uuid.UUID) ([]models.Order, error)
-	GetByOrderNumber(ctx context.Context, orderNumber string) (models.Order, error)
 }
 
 type OrderHandler struct {
@@ -35,7 +33,6 @@ func (h *OrderHandler) Register(g *echo.Group) {
 	orders := g.Group("/user/orders", middleware.JWT())
 	orders.POST("", h.create)
 	orders.GET("", h.list)
-	orders.GET("/:number", h.getByNumber)
 }
 
 func (h *OrderHandler) create(c *echo.Context) error {
@@ -54,22 +51,16 @@ func (h *OrderHandler) create(c *echo.Context) error {
 		return mapAppError(err)
 	}
 
-	created, err := h.orders.Create(c.Request().Context(), models.Order{
+	if _, err := h.orders.Create(c.Request().Context(), models.Order{
 		OrderNumber: req.Number,
 		UserID:      userID,
-	})
-	if errors.Is(err, apperrors.Conflict(services.OrderAlreadyExists)) {
+	}); errors.Is(err, services.ErrOrderAlreadyUploaded) {
 		return c.NoContent(http.StatusOK)
-	}
-	if err != nil {
+	} else if err != nil {
 		return mapAppError(err)
 	}
 
-	return c.JSON(http.StatusCreated, dto.OrderResponse{
-		Number:     created.OrderNumber,
-		Status:     created.Status,
-		UploadedAt: created.CreatedAt,
-	})
+	return c.NoContent(http.StatusAccepted)
 }
 
 func (h *OrderHandler) list(c *echo.Context) error {
@@ -88,12 +79,15 @@ func (h *OrderHandler) list(c *echo.Context) error {
 
 	response := make([]dto.OrderResponse, 0, len(orders))
 	for _, order := range orders {
-		response = append(response, dto.OrderResponse{
+		item := dto.OrderResponse{
 			Number:     order.OrderNumber,
 			Status:     order.Status,
 			UploadedAt: order.CreatedAt,
-			Accrual:    &order.Accrual,
-		})
+		}
+		if order.Accrual > 0 {
+			item.Accrual = &order.Accrual
+		}
+		response = append(response, item)
 	}
 
 	if len(response) == 0 {
@@ -101,26 +95,4 @@ func (h *OrderHandler) list(c *echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, response)
-}
-
-func (h *OrderHandler) getByNumber(c *echo.Context) error {
-	userID, err := common.UserIDFromContext(c)
-	if err != nil {
-		return mapAppError(err)
-	}
-
-	order, err := h.orders.GetByOrderNumber(c.Request().Context(), c.Param("number"))
-	if err != nil {
-		return mapAppError(err)
-	}
-	if order.UserID != userID {
-		return mapAppError(apperrors.NotFound("order_not_found"))
-	}
-
-	return c.JSON(http.StatusOK, dto.OrderResponse{
-		Number:     order.OrderNumber,
-		Status:     order.Status,
-		UploadedAt: order.CreatedAt,
-		Accrual:    &order.Accrual,
-	})
 }
