@@ -15,14 +15,14 @@ const (
 	conflictPostfix = "_already_exists"
 )
 
-func mapRepositoryError(logger *zap.SugaredLogger, err error, entity_name string) error {
+func mapRepositoryError(logger *zap.SugaredLogger, err error, entityName string) error {
 	if errors.Is(err, sql.ErrNoRows) {
-		return apperrors.NotFound(entity_name + notFoundPostfix)
+		return apperrors.NotFound(entityName + notFoundPostfix)
 	}
 
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == resources.UniqueViolation {
-		return apperrors.Conflict(entity_name + conflictPostfix)
+		return apperrors.Conflict(entityName + conflictPostfix)
 	}
 
 	logger.Errorw("database", "error", err)

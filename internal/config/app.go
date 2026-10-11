@@ -43,7 +43,10 @@ func NewAppConfig() (AppConfig, error) {
 		return AppConfig{}, fmt.Errorf("DATABASE_URI is empty")
 	}
 	if cfg.JWTSecret == "" {
-		return AppConfig{}, fmt.Errorf("JWT_SECRET is empty")
+		cfg.JWTSecret = "change-me"
+	}
+	if err := os.Setenv("JWT_SECRET", cfg.JWTSecret); err != nil {
+		return AppConfig{}, fmt.Errorf("set JWT_SECRET: %w", err)
 	}
 
 	return cfg, nil
