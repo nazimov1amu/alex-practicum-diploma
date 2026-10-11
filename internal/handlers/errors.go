@@ -26,6 +26,10 @@ func mapAppError(err error) error {
 		status = http.StatusForbidden
 	case apperrors.KindConflict:
 		status = http.StatusConflict
+	case apperrors.KindValidationError:
+		status = http.StatusUnprocessableEntity
+	case apperrors.KindPaymentRequired:
+		status = http.StatusPaymentRequired
 	case apperrors.KindInternal:
 		status = http.StatusInternalServerError
 	}

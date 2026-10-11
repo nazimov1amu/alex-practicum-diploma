@@ -20,22 +20,22 @@ func NewEventRepository(db *sql.DB) *EventRepository {
 func (r *EventRepository) Create(ctx context.Context, tx *sql.Tx, event models.Event) (models.Event, error) {
 	const q = `
 		WITH inserted AS (
-			INSERT INTO events (user_id, event_type, amount)
-			VALUES ($1, $2, $3)
-			RETURNING id, user_id, event_type, amount
+			INSERT INTO events (user_id, order_number, event_type, amount)
+			VALUES ($1, $2, $3, $4)
+			RETURNING id, user_id, order_number, event_type, amount
 		)
-		SELECT id, user_id, event_type, amount
+		SELECT id, user_id, order_number, event_type, amount
 		FROM inserted
 	`
 
 	var created models.Event
-	err := sqlscan.Get(ctx, DBorTx(r.db, tx), &created, q, event.UserID, event.EventType, event.Amount)
+	err := sqlscan.Get(ctx, DBorTx(r.db, tx), &created, q, event.UserID, event.OrderNumber, event.EventType, event.Amount)
 	return created, err
 }
 
 func (r *EventRepository) GetByID(ctx context.Context, id uuid.UUID) (models.Event, error) {
 	const q = `
-		SELECT id, user_id, event_type, amount
+		SELECT id, user_id, order_number, event_type, amount
 		FROM events
 		WHERE id = $1
 	`
@@ -47,9 +47,9 @@ func (r *EventRepository) GetByID(ctx context.Context, id uuid.UUID) (models.Eve
 
 func (r *EventRepository) ListWithdrawalsByUserID(ctx context.Context, userID uuid.UUID) ([]models.Event, error) {
 	const q = `
-		SELECT id, user_id, order_id, event_type, amount
+		SELECT id, user_id, order_number, event_type, amount, created_at
 		FROM events
-		WHERE user_id = $1 AND event_type = 'withdraw'
+		WHERE user_id = $1 AND event_type = 'withdrawal'
 		ORDER BY created_at DESC
 	`
 

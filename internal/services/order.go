@@ -3,7 +3,9 @@ package services
 import (
 	"context"
 	"database/sql"
+	"errors"
 
+	"github.com/google/uuid"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/apperrors"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/models"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/repositories"
@@ -28,20 +30,31 @@ func NewOrderService(db *sql.DB, logger *zap.SugaredLogger) *OrderService {
 }
 
 func (s *OrderService) Create(ctx context.Context, order models.Order) (models.Order, error) {
-	existing, _ := s.orders.GetByOrderNumber(ctx, order.OrderNumber)
-	if existing.UserID != order.UserID {
+	existing, err := s.orders.GetByOrderNumber(ctx, order.OrderNumber)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return models.Order{}, mapRepositoryError(s.logger, err, "order")
+	}
+	if err == nil && existing.UserID != order.UserID {
 		return models.Order{}, apperrors.Conflict(OrderAlreadyExists)
 	}
-
-	if !luhn(order.OrderNumber) {
-		return models.Order{}, apperrors.ValidationError(InvalidOrderNumber)
+	if err == nil {
+		return existing, nil
 	}
 
+	order.Status = models.OrderStatusRegistered
 	created, err := s.orders.Create(ctx, order)
 	if err != nil {
 		return models.Order{}, mapRepositoryError(s.logger, err, "order")
 	}
 	return created, nil
+}
+
+func (s *OrderService) List(ctx context.Context, userID uuid.UUID) ([]models.Order, error) {
+	orders, err := s.orders.ListByUserID(ctx, userID)
+	if err != nil {
+		return nil, mapRepositoryError(s.logger, err, "order")
+	}
+	return orders, nil
 }
 
 func (s *OrderService) GetByOrderNumber(ctx context.Context, orderNumber string) (models.Order, error) {
@@ -50,30 +63,4 @@ func (s *OrderService) GetByOrderNumber(ctx context.Context, orderNumber string)
 		return models.Order{}, mapRepositoryError(s.logger, err, "order")
 	}
 	return order, nil
-}
-
-func luhn(number string) bool {
-	if number == "" {
-		return false
-	}
-
-	sum := 0
-	double := false
-	for i := len(number) - 1; i >= 0; i-- {
-		digit := number[i]
-		if digit < '0' || digit > '9' {
-			return false
-		}
-
-		n := int(digit - '0')
-		if double {
-			n *= 2
-			if n > 9 {
-				n -= 9
-			}
-		}
-		sum += n
-		double = !double
-	}
-	return sum%10 == 0
 }

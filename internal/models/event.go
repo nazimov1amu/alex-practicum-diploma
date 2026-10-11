@@ -1,6 +1,8 @@
 package models
 
 import (
+	"time"
+
 	"github.com/google/uuid"
 )
 
@@ -17,4 +19,5 @@ type Event struct {
 	OrderNumber string    `db:"order_number"`
 	EventType   EventType `db:"event_type"`
 	Amount      float64   `db:"amount"`
+	CreatedAt   time.Time `db:"created_at"`
 }

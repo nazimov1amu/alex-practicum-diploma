@@ -3,18 +3,21 @@ package services
 import (
 	"context"
 	"database/sql"
+	"errors"
 
 	"github.com/google/uuid"
+	"github.com/nazimov1amu/alex-practicum-diploma/internal/apperrors"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/models"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/repositories"
 	"go.uber.org/zap"
 )
 
+const insufficientBalance = "insufficient_balance"
+
 type EventService struct {
 	db     *sql.DB
 	events *repositories.EventRepository
 	user   *repositories.UserRepository
-	order  *repositories.OrderRepository
 	logger *zap.SugaredLogger
 }
 
@@ -23,7 +26,6 @@ func NewEventService(db *sql.DB, logger *zap.SugaredLogger) *EventService {
 		db:     db,
 		events: repositories.NewEventRepository(db),
 		user:   repositories.NewUserRepository(db),
-		order:  repositories.NewOrderRepository(db),
 		logger: logger,
 	}
 }
@@ -34,28 +36,20 @@ func (s *EventService) Create(ctx context.Context, event models.Event) (models.E
 		return models.Event{}, mapRepositoryError(s.logger, err, "event")
 	}
 	defer tx.Rollback()
+
 	user, err := s.user.GetByID(ctx, event.UserID)
 	if err != nil {
 		return models.Event{}, mapRepositoryError(s.logger, err, "user")
 	}
 
-	if event.EventType == models.EventTypeWithdrawal {
-		order, err := s.order.GetByOrderNumber(ctx, event.OrderNumber)
-		if err != nil {
-			return models.Event{}, mapRepositoryError(s.logger, err, "order")
-		}
-		if order.UserID != user.ID {
-			return models.Event{}, mapRepositoryError(s.logger, err, "order")
-		}
+	if event.EventType == models.EventTypeWithdrawal && user.Balance < event.Amount {
+		return models.Event{}, apperrors.PaymentRequired(insufficientBalance)
 	}
 
-	delta := eventDelta(event)
-
-	if user.Balance < delta {
-		return models.Event{}, mapRepositoryError(s.logger, err, "user")
+	err = s.user.AddBalance(ctx, tx, event.UserID, eventDelta(event))
+	if errors.Is(err, repositories.ErrInsufficientBalance) {
+		return models.Event{}, apperrors.PaymentRequired(insufficientBalance)
 	}
-
-	err = s.user.AddBalance(ctx, tx, event.UserID, delta)
 	if err != nil {
 		return models.Event{}, mapRepositoryError(s.logger, err, "user")
 	}

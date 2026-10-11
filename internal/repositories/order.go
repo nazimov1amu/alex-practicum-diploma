@@ -22,9 +22,9 @@ func (r *OrderRepository) Create(ctx context.Context, order models.Order) (model
 		WITH inserted AS (
 			INSERT INTO orders (order_number, user_id, status, accrual)
 			VALUES ($1, $2, $3, $4)
-			RETURNING id, order_number, user_id, status, accrual
+			RETURNING id, order_number, user_id, status, accrual, created_at
 		)
-		SELECT id, order_number, user_id, status, accrual
+		SELECT id, order_number, user_id, status, accrual, created_at
 		FROM inserted
 	`
 
@@ -33,21 +33,22 @@ func (r *OrderRepository) Create(ctx context.Context, order models.Order) (model
 	return created, err
 }
 
-func (r *OrderRepository) GetByID(ctx context.Context, id uuid.UUID) (models.Order, error) {
+func (r *OrderRepository) ListByUserID(ctx context.Context, userID uuid.UUID) ([]models.Order, error) {
 	const q = `
-		SELECT id, order_number, user_id, status, accrual
+		SELECT id, order_number, user_id, status, accrual, created_at
 		FROM orders
-		WHERE id = $1
+		WHERE user_id = $1
+		ORDER BY created_at DESC
 	`
 
-	var order models.Order
-	err := sqlscan.Get(ctx, r.db, &order, q, id)
-	return order, err
+	var orders []models.Order
+	err := sqlscan.Select(ctx, r.db, &orders, q, userID)
+	return orders, err
 }
 
 func (r *OrderRepository) GetByOrderNumber(ctx context.Context, orderNumber string) (models.Order, error) {
 	const q = `
-		SELECT id, order_number, user_id, status, accrual
+		SELECT id, order_number, user_id, status, accrual, created_at
 		FROM orders
 		WHERE order_number = $1
 	`

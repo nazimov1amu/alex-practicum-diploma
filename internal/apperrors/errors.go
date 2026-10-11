@@ -12,6 +12,7 @@ const (
 	KindConflict
 	KindInternal
 	KindValidationError
+	KindPaymentRequired
 )
 
 const (
@@ -47,6 +48,7 @@ var (
 	ErrConflict        = &AppError{Kind: KindConflict}
 	ErrInternal        = &AppError{Kind: KindInternal}
 	ErrValidationError = &AppError{Kind: KindValidationError}
+	ErrPaymentRequired = &AppError{Kind: KindPaymentRequired}
 )
 
 func NotFound(message string) error {
@@ -71,6 +73,10 @@ func Conflict(message string) error {
 
 func ValidationError(message string) error {
 	return &AppError{Kind: KindValidationError, Message: message}
+}
+
+func PaymentRequired(message string) error {
+	return &AppError{Kind: KindPaymentRequired, Message: message}
 }
 
 func Internal(message string) error {

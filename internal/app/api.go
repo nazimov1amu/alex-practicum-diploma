@@ -12,7 +12,6 @@ import (
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/config"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/db"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/handlers"
-	"github.com/nazimov1amu/alex-practicum-diploma/internal/routes"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/services"
 	"go.uber.org/zap"
 )
@@ -24,7 +23,6 @@ type App struct {
 	address string
 	ctx     context.Context
 	cancel  context.CancelFunc
-	done    chan struct{}
 }
 
 func NewApp() (*App, error) {
@@ -56,18 +54,18 @@ func NewApp() (*App, error) {
 	return &App{
 		logger: sugar,
 		db:     database,
-		echo: routes.Router([]routes.Handler{
+		echo: handlers.Router([]handlers.Handler{
 			handlers.NewUserHandler(services.NewUserService(database, sugar)),
+			handlers.NewOrderHandler(services.NewOrderService(database, sugar)),
+			handlers.NewEventHandler(services.NewEventService(database, sugar)),
 		}),
 		address: address,
 		ctx:     ctx,
 		cancel:  cancel,
-		done:    make(chan struct{}),
 	}, nil
 }
 
 func (a *App) Run() error {
-	defer close(a.done)
 
 	sc := echo.StartConfig{
 		Address:         a.address,
@@ -83,8 +81,6 @@ func (a *App) Run() error {
 
 func (a *App) Stop() error {
 	a.cancel()
-	<-a.done
-
 	err := a.db.Close()
 	return err
 }

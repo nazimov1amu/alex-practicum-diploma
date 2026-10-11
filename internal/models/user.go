@@ -12,6 +12,6 @@ type User struct {
 }
 
 type UserBalance struct {
-	Current   float64 `json:"current" db:"current"`
-	Withdrawn float64 `json:"withdrawn" db:"withdrawn"`
+	Current   float64 `db:"current"`
+	Withdrawn float64 `db:"withdrawn"`
 }
