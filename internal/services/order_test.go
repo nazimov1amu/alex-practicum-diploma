@@ -18,8 +18,10 @@ type fakeOrderStore struct {
 	getErr   error
 	created  models.Order
 	stored   models.Order
+	updated  models.Order
 	list     []models.Order
 	listErr  error
+	pending  []models.Order
 }
 
 func (f *fakeOrderStore) GetByOrderNumber(context.Context, string) (models.Order, error) {
@@ -36,6 +38,15 @@ func (f *fakeOrderStore) Create(_ context.Context, order models.Order) (models.O
 
 func (f *fakeOrderStore) ListByUserID(context.Context, uuid.UUID) ([]models.Order, error) {
 	return f.list, f.listErr
+}
+
+func (f *fakeOrderStore) ListPending(context.Context) ([]models.Order, error) {
+	return f.pending, f.listErr
+}
+
+func (f *fakeOrderStore) Update(_ context.Context, order models.Order) (models.Order, error) {
+	f.updated = order
+	return order, nil
 }
 
 func TestOrderService_Create(t *testing.T) {

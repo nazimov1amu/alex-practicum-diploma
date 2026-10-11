@@ -4,7 +4,6 @@ import (
 	"database/sql"
 
 	"github.com/georgysavva/scany/v2/sqlscan"
-	"github.com/google/uuid"
 )
 
 func nullString(value string) *string {
@@ -14,8 +13,8 @@ func nullString(value string) *string {
 	return &value
 }
 
-func nullUUID(value uuid.UUID) *uuid.UUID {
-	if value == uuid.Nil {
+func nullFloat64(value float64) *float64 {
+	if value == 0 {
 		return nil
 	}
 	return &value

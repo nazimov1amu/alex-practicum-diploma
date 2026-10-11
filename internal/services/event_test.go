@@ -21,8 +21,11 @@ type fakeEventStore struct {
 	listErr error
 }
 
-func (f *fakeEventStore) Create(context.Context, *sql.Tx, models.Event) (models.Event, error) {
+func (f *fakeEventStore) Create(_ context.Context, _ *sql.Tx, event models.Event) (models.Event, error) {
 	f.called = true
+	if f.created.ID == uuid.Nil {
+		f.created = event
+	}
 	return f.created, nil
 }
 

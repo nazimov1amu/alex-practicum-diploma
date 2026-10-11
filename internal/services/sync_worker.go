@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,17 +11,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/models"
 	"go.uber.org/zap"
 )
 
 const accrualPollInterval = time.Second
-
-type accrualOrderStore interface {
-	ListPending(ctx context.Context) ([]models.Order, error)
-	ApplyAccrual(ctx context.Context, tx *sql.Tx, number, status string, accrual float64) (uuid.UUID, bool, error)
-}
 
 type accrualResult struct {
 	Order   string  `json:"order"`
@@ -40,19 +33,17 @@ func (e tooManyRequestsError) Error() string {
 
 type SyncWorker struct {
 	baseURL string
-	db      *sql.DB
-	orders  accrualOrderStore
-	users   userBalanceStore
+	orders  *OrderService
+	events  *EventService
 	client  *http.Client
 	logger  *zap.SugaredLogger
 }
 
-func NewSyncWorker(baseURL string, db *sql.DB, orders accrualOrderStore, users userBalanceStore, logger *zap.SugaredLogger) *SyncWorker {
+func NewSyncWorker(baseURL string, orders *OrderService, events *EventService, logger *zap.SugaredLogger) *SyncWorker {
 	return &SyncWorker{
 		baseURL: strings.TrimRight(baseURL, "/"),
-		db:      db,
 		orders:  orders,
-		users:   users,
+		events:  events,
 		client:  &http.Client{Timeout: 10 * time.Second},
 		logger:  logger,
 	}
@@ -111,22 +102,25 @@ func (w *SyncWorker) syncOrder(ctx context.Context, order models.Order) error {
 		return nil
 	}
 
-	tx, err := w.db.BeginTx(ctx, nil)
-	if err != nil {
+	if _, err := w.orders.Update(ctx, models.Order{
+		ID:      order.ID,
+		Status:  status,
+		Accrual: result.Accrual,
+	}); err != nil {
 		return err
 	}
-	defer tx.Rollback()
 
-	userID, updated, err := w.orders.ApplyAccrual(ctx, tx, order.OrderNumber, status, result.Accrual)
-	if err != nil {
-		return err
+	if status != models.OrderStatusProcessed || result.Accrual <= 0 {
+		return nil
 	}
-	if updated && status == models.OrderStatusProcessed && result.Accrual > 0 {
-		if err := w.users.AddBalance(ctx, tx, userID, result.Accrual); err != nil {
-			return err
-		}
-	}
-	return tx.Commit()
+
+	_, err = w.events.Create(ctx, models.Event{
+		UserID:      order.UserID,
+		OrderNumber: order.OrderNumber,
+		EventType:   models.EventTypeDeposit,
+		Amount:      result.Accrual,
+	})
+	return err
 }
 
 func (w *SyncWorker) fetchAccrual(ctx context.Context, number string) (*accrualResult, error) {

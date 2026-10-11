@@ -53,7 +53,7 @@ func NewApp() (*App, error) {
 	orderService := services.NewOrderService(database, sugar, orderStore)
 	eventService := services.NewEventService(database, sugar, eventStore, userStore)
 
-	worker := services.NewSyncWorker(cfg.AccrualSystemAddress, database, orderStore, userStore, sugar)
+	worker := services.NewSyncWorker(cfg.AccrualSystemAddress, orderService, eventService, sugar)
 	go worker.Run(ctx)
 
 	return &App{

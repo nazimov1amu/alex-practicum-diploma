@@ -26,7 +26,9 @@ type OrderService struct {
 type orderStore interface {
 	Create(ctx context.Context, order models.Order) (models.Order, error)
 	ListByUserID(ctx context.Context, userID uuid.UUID) ([]models.Order, error)
+	ListPending(ctx context.Context) ([]models.Order, error)
 	GetByOrderNumber(ctx context.Context, orderNumber string) (models.Order, error)
+	Update(ctx context.Context, order models.Order) (models.Order, error)
 }
 
 func NewOrderService(db *sql.DB, logger *zap.SugaredLogger, orders orderStore) *OrderService {
@@ -56,10 +58,26 @@ func (s *OrderService) Create(ctx context.Context, order models.Order) (models.O
 	return created, nil
 }
 
+func (s *OrderService) ListPending(ctx context.Context) ([]models.Order, error) {
+	orders, err := s.orders.ListPending(ctx)
+	if err != nil {
+		return nil, mapRepositoryError(s.logger, err, "order")
+	}
+	return orders, nil
+}
+
 func (s *OrderService) List(ctx context.Context, userID uuid.UUID) ([]models.Order, error) {
 	orders, err := s.orders.ListByUserID(ctx, userID)
 	if err != nil {
 		return nil, mapRepositoryError(s.logger, err, "order")
 	}
 	return orders, nil
+}
+
+func (s *OrderService) Update(ctx context.Context, order models.Order) (models.Order, error) {
+	updated, err := s.orders.Update(ctx, order)
+	if err != nil {
+		return models.Order{}, mapRepositoryError(s.logger, err, "order")
+	}
+	return updated, nil
 }

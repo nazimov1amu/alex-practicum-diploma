@@ -3,7 +3,6 @@ package repositories
 import (
 	"context"
 	"database/sql"
-	"errors"
 
 	"github.com/georgysavva/scany/v2/sqlscan"
 	"github.com/google/uuid"
@@ -60,23 +59,18 @@ func (r *OrderRepository) ListPending(ctx context.Context) ([]models.Order, erro
 	return orders, err
 }
 
-func (r *OrderRepository) ApplyAccrual(ctx context.Context, tx *sql.Tx, number, status string, accrual float64) (uuid.UUID, bool, error) {
+func (r *OrderRepository) Update(ctx context.Context, order models.Order) (models.Order, error) {
 	const q = `
 		UPDATE orders
-		SET status = $2::varchar,
-		    accrual = CASE WHEN $2::varchar IN ('PROCESSED', 'INVALID') THEN $3::numeric ELSE accrual END,
-		    updated_at = NOW()
-		WHERE order_number = $1
-		  AND status NOT IN ('PROCESSED', 'INVALID')
-		RETURNING user_id
+		SET status = COALESCE($2::varchar, status),
+		    accrual = COALESCE($3::numeric, accrual)
+		WHERE id = $1
+		RETURNING id, order_number, user_id, status, accrual, created_at
 	`
 
-	var userID uuid.UUID
-	err := sqlscan.Get(ctx, DBorTx(r.db, tx), &userID, q, number, status, accrual)
-	if errors.Is(err, sql.ErrNoRows) {
-		return uuid.Nil, false, nil
-	}
-	return userID, err == nil, err
+	var updated models.Order
+	err := sqlscan.Get(ctx, r.db, &updated, q, order.ID, nullString(order.Status), nullFloat64(order.Accrual))
+	return updated, err
 }
 
 func (r *OrderRepository) GetByOrderNumber(ctx context.Context, orderNumber string) (models.Order, error) {
