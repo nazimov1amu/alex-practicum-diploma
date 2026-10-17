@@ -1,0 +1,185 @@
+package services
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/nazimov1amu/alex-practicum-diploma/internal/models"
+	"github.com/shopspring/decimal"
+	"go.uber.org/zap"
+)
+
+const accrualPollInterval = time.Second
+
+type accrualResult struct {
+	Order   string          `json:"order"`
+	Status  string          `json:"status"`
+	Accrual decimal.Decimal `json:"accrual"`
+}
+
+type tooManyRequestsError struct {
+	retryAfter time.Duration
+}
+
+func (e tooManyRequestsError) Error() string {
+	return "accrual too many requests"
+}
+
+type SyncWorker struct {
+	baseURL string
+	orders  *OrderService
+	events  *EventService
+	client  *http.Client
+	logger  *zap.SugaredLogger
+	done    chan struct{}
+}
+
+func NewSyncWorker(baseURL string, orders *OrderService, events *EventService, logger *zap.SugaredLogger) *SyncWorker {
+	return &SyncWorker{
+		baseURL: strings.TrimRight(baseURL, "/"),
+		orders:  orders,
+		events:  events,
+		client:  &http.Client{Timeout: 10 * time.Second},
+		logger:  logger,
+		done:    make(chan struct{}),
+	}
+}
+
+func (w *SyncWorker) Done() <-chan struct{} {
+	return w.done
+}
+
+func (w *SyncWorker) Run(ctx context.Context) {
+	defer close(w.done)
+
+	if w.baseURL == "" {
+		return
+	}
+
+	ticker := time.NewTicker(accrualPollInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			w.tick(ctx)
+		}
+	}
+}
+
+func (w *SyncWorker) tick(ctx context.Context) {
+	orders, err := w.orders.ListPending(ctx)
+	if err != nil {
+		if ctx.Err() == nil {
+			w.logger.Errorw("list pending orders", "error", err)
+		}
+		return
+	}
+
+	for _, order := range orders {
+		if ctx.Err() != nil {
+			return
+		}
+		if err := w.syncOrder(context.WithoutCancel(ctx), order); err != nil {
+			var limited tooManyRequestsError
+			if errors.As(err, &limited) {
+				timer := time.NewTimer(limited.retryAfter)
+				defer timer.Stop()
+				select {
+				case <-ctx.Done():
+				case <-timer.C:
+				}
+				return
+			}
+			w.logger.Errorw("sync order", "order", order.OrderNumber, "error", err)
+		}
+	}
+}
+
+func (w *SyncWorker) syncOrder(ctx context.Context, order models.Order) error {
+	result, err := w.fetchAccrual(ctx, order.OrderNumber)
+	if err != nil || result == nil {
+		return err
+	}
+
+	status := mapAccrualStatus(result.Status)
+	if status == "" {
+		return nil
+	}
+
+	if _, err := w.orders.Update(ctx, models.Order{
+		ID:      order.ID,
+		Status:  status,
+		Accrual: result.Accrual,
+	}); err != nil {
+		return err
+	}
+
+	if status != models.OrderStatusProcessed || !result.Accrual.IsPositive() {
+		return nil
+	}
+
+	_, err = w.events.Create(ctx, models.Event{
+		UserID:      order.UserID,
+		OrderNumber: order.OrderNumber,
+		EventType:   models.EventTypeDeposit,
+		Amount:      result.Accrual,
+	})
+	return err
+}
+
+func (w *SyncWorker) fetchAccrual(ctx context.Context, number string) (*accrualResult, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, w.baseURL+"/api/orders/"+number, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := w.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	switch resp.StatusCode {
+	case http.StatusNoContent:
+		return nil, nil
+	case http.StatusTooManyRequests:
+		retryAfter := time.Second
+		if seconds, err := strconv.Atoi(resp.Header.Get("Retry-After")); err == nil && seconds > 0 {
+			retryAfter = time.Duration(seconds) * time.Second
+		}
+		io.Copy(io.Discard, resp.Body)
+		return nil, tooManyRequestsError{retryAfter: retryAfter}
+	case http.StatusOK:
+		var result accrualResult
+		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+			return nil, fmt.Errorf("decode accrual: %w", err)
+		}
+		return &result, nil
+	default:
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return nil, fmt.Errorf("accrual status %d: %s", resp.StatusCode, body)
+	}
+}
+
+func mapAccrualStatus(status string) string {
+	switch status {
+	case models.OrderStatusRegistered, models.OrderStatusProcessing:
+		return models.OrderStatusProcessing
+	case models.OrderStatusProcessed:
+		return models.OrderStatusProcessed
+	case models.OrderStatusInvalid:
+		return models.OrderStatusInvalid
+	default:
+		return ""
+	}
+}
