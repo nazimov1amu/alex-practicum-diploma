@@ -12,15 +12,16 @@ import (
 	"time"
 
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/models"
+	"github.com/shopspring/decimal"
 	"go.uber.org/zap"
 )
 
 const accrualPollInterval = time.Second
 
 type accrualResult struct {
-	Order   string  `json:"order"`
-	Status  string  `json:"status"`
-	Accrual float64 `json:"accrual"`
+	Order   string          `json:"order"`
+	Status  string          `json:"status"`
+	Accrual decimal.Decimal `json:"accrual"`
 }
 
 type tooManyRequestsError struct {
@@ -37,6 +38,7 @@ type SyncWorker struct {
 	events  *EventService
 	client  *http.Client
 	logger  *zap.SugaredLogger
+	done    chan struct{}
 }
 
 func NewSyncWorker(baseURL string, orders *OrderService, events *EventService, logger *zap.SugaredLogger) *SyncWorker {
@@ -46,10 +48,17 @@ func NewSyncWorker(baseURL string, orders *OrderService, events *EventService, l
 		events:  events,
 		client:  &http.Client{Timeout: 10 * time.Second},
 		logger:  logger,
+		done:    make(chan struct{}),
 	}
 }
 
+func (w *SyncWorker) Done() <-chan struct{} {
+	return w.done
+}
+
 func (w *SyncWorker) Run(ctx context.Context) {
+	defer close(w.done)
+
 	if w.baseURL == "" {
 		return
 	}
@@ -70,12 +79,17 @@ func (w *SyncWorker) Run(ctx context.Context) {
 func (w *SyncWorker) tick(ctx context.Context) {
 	orders, err := w.orders.ListPending(ctx)
 	if err != nil {
-		w.logger.Errorw("list pending orders", "error", err)
+		if ctx.Err() == nil {
+			w.logger.Errorw("list pending orders", "error", err)
+		}
 		return
 	}
 
 	for _, order := range orders {
-		if err := w.syncOrder(ctx, order); err != nil {
+		if ctx.Err() != nil {
+			return
+		}
+		if err := w.syncOrder(context.WithoutCancel(ctx), order); err != nil {
 			var limited tooManyRequestsError
 			if errors.As(err, &limited) {
 				timer := time.NewTimer(limited.retryAfter)
@@ -110,7 +124,7 @@ func (w *SyncWorker) syncOrder(ctx context.Context, order models.Order) error {
 		return err
 	}
 
-	if status != models.OrderStatusProcessed || result.Accrual <= 0 {
+	if status != models.OrderStatusProcessed || !result.Accrual.IsPositive() {
 		return nil
 	}
 

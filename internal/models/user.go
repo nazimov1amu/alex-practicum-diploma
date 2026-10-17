@@ -2,16 +2,17 @@ package models
 
 import (
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 )
 
 type User struct {
-	ID       uuid.UUID `db:"id"`
-	Login    string    `db:"login"`
-	Password string    `db:"password"`
-	Balance  float64   `db:"balance"`
+	ID       uuid.UUID       `db:"id"`
+	Login    string          `db:"login"`
+	Password string          `db:"password"`
+	Balance  decimal.Decimal `db:"balance"`
 }
 
 type UserBalance struct {
-	Current   float64 `db:"current"`
-	Withdrawn float64 `db:"withdrawn"`
+	Current   decimal.Decimal `db:"current"`
+	Withdrawn decimal.Decimal `db:"withdrawn"`
 }

@@ -24,6 +24,7 @@ type App struct {
 	address string
 	ctx     context.Context
 	cancel  context.CancelFunc
+	worker  *services.SyncWorker
 }
 
 func NewApp() (*App, error) {
@@ -67,6 +68,7 @@ func NewApp() (*App, error) {
 		address: cfg.Address,
 		ctx:     ctx,
 		cancel:  cancel,
+		worker:  worker,
 	}, nil
 }
 
@@ -85,6 +87,6 @@ func (a *App) Run() error {
 
 func (a *App) Stop() error {
 	a.cancel()
-	err := a.db.Close()
-	return err
+	<-a.worker.Done()
+	return a.db.Close()
 }

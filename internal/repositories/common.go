@@ -4,6 +4,7 @@ import (
 	"database/sql"
 
 	"github.com/georgysavva/scany/v2/sqlscan"
+	"github.com/shopspring/decimal"
 )
 
 func nullString(value string) *string {
@@ -13,11 +14,11 @@ func nullString(value string) *string {
 	return &value
 }
 
-func nullFloat64(value float64) *float64 {
-	if value == 0 {
-		return nil
+func nullDecimal(value decimal.Decimal) decimal.NullDecimal {
+	if value.IsZero() {
+		return decimal.NullDecimal{}
 	}
-	return &value
+	return decimal.NewNullDecimal(value)
 }
 
 func DBorTx(db *sql.DB, tx *sql.Tx) sqlscan.Querier {

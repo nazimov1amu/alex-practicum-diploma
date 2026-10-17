@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 )
 
 type EventType string
@@ -14,10 +15,10 @@ const (
 )
 
 type Event struct {
-	ID          uuid.UUID `db:"id"`
-	UserID      uuid.UUID `db:"user_id"`
-	OrderNumber string    `db:"order_number"`
-	EventType   EventType `db:"event_type"`
-	Amount      float64   `db:"amount"`
-	CreatedAt   time.Time `db:"created_at"`
+	ID          uuid.UUID       `db:"id"`
+	UserID      uuid.UUID       `db:"user_id"`
+	OrderNumber string          `db:"order_number"`
+	EventType   EventType       `db:"event_type"`
+	Amount      decimal.Decimal `db:"amount"`
+	CreatedAt   time.Time       `db:"created_at"`
 }

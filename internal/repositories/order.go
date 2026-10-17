@@ -69,7 +69,7 @@ func (r *OrderRepository) Update(ctx context.Context, order models.Order) (model
 	`
 
 	var updated models.Order
-	err := sqlscan.Get(ctx, r.db, &updated, q, order.ID, nullString(order.Status), nullFloat64(order.Accrual))
+	err := sqlscan.Get(ctx, r.db, &updated, q, order.ID, nullString(order.Status), nullDecimal(order.Accrual))
 	return updated, err
 }
 

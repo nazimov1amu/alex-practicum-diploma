@@ -11,6 +11,7 @@ import (
 	"github.com/labstack/echo/v5"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/models"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/resources"
+	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -31,7 +32,7 @@ func TestEventHandler_withdraw(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Equal(t, userID, events.got.UserID)
 	assert.Equal(t, "2377225624", events.got.OrderNumber)
-	assert.Equal(t, 50.0, events.got.Amount)
+	assert.True(t, decimal.NewFromInt(50).Equal(events.got.Amount))
 	assert.Equal(t, models.EventTypeWithdrawal, events.got.EventType)
 }
 

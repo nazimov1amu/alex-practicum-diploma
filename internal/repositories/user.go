@@ -8,6 +8,7 @@ import (
 	"github.com/georgysavva/scany/v2/sqlscan"
 	"github.com/google/uuid"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/models"
+	"github.com/shopspring/decimal"
 )
 
 var ErrInsufficientBalance = errors.New("insufficient balance")
@@ -76,7 +77,7 @@ func (r *UserRepository) GetBalance(ctx context.Context, userID uuid.UUID) (mode
 	return balance, err
 }
 
-func (r *UserRepository) AddBalance(ctx context.Context, tx *sql.Tx, userID uuid.UUID, delta float64) error {
+func (r *UserRepository) AddBalance(ctx context.Context, tx *sql.Tx, userID uuid.UUID, delta decimal.Decimal) error {
 	const q = `
 		UPDATE users
 		SET balance = balance + $2

@@ -14,6 +14,7 @@ import (
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/models"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/resources"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/services"
+	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -38,7 +39,7 @@ func TestUserHandler_register(t *testing.T) {
 }
 
 func TestUserHandler_balance(t *testing.T) {
-	h := &UserHandler{users: &fakeUsers{balance: models.UserBalance{Current: 100, Withdrawn: 20}}}
+	h := &UserHandler{users: &fakeUsers{balance: models.UserBalance{Current: decimal.NewFromInt(100), Withdrawn: decimal.NewFromInt(20)}}}
 
 	e := echo.New()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -51,8 +52,8 @@ func TestUserHandler_balance(t *testing.T) {
 
 	var got dto.BalanceResponse
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &got))
-	assert.Equal(t, 100.0, got.Current)
-	assert.Equal(t, 20.0, got.Withdrawn)
+	assert.True(t, decimal.NewFromInt(100).Equal(got.Current))
+	assert.True(t, decimal.NewFromInt(20).Equal(got.Withdrawn))
 }
 
 type fakeUsers struct {

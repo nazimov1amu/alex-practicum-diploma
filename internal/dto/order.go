@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/apperrors"
+	"github.com/shopspring/decimal"
 )
 
 const invalidRequestBody = "invalid_request_body"
@@ -26,10 +27,10 @@ func (r UploadOrderRequest) Validate() error {
 }
 
 type OrderResponse struct {
-	Number     string    `json:"number"`
-	Status     string    `json:"status"`
-	Accrual    *float64  `json:"accrual,omitempty"`
-	UploadedAt time.Time `json:"uploaded_at"`
+	Number     string           `json:"number"`
+	Status     string           `json:"status"`
+	Accrual    *decimal.Decimal `json:"accrual,omitempty"`
+	UploadedAt time.Time        `json:"uploaded_at"`
 }
 
 func ValidLuhn(number string) bool {

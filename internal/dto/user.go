@@ -1,7 +1,14 @@
 package dto
 
-import "github.com/nazimov1amu/alex-practicum-diploma/internal/apperrors"
+import (
+	"github.com/nazimov1amu/alex-practicum-diploma/internal/apperrors"
+	"github.com/shopspring/decimal"
+)
 
+func init() {
+	// Gophermart sends amounts as JSON numbers. DECIMAL(10, 2) fits in that format.
+	decimal.MarshalJSONWithoutQuotes = true
+}
 
 type Credentials struct {
 	Login    string `json:"login"`
@@ -32,6 +39,6 @@ type TokenPairResponse struct {
 }
 
 type BalanceResponse struct {
-	Current   float64 `json:"current"`
-	Withdrawn float64 `json:"withdrawn"`
+	Current   decimal.Decimal `json:"current"`
+	Withdrawn decimal.Decimal `json:"withdrawn"`
 }

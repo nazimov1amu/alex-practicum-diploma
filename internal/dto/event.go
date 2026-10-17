@@ -1,16 +1,19 @@
 package dto
 
-import "time"
+import (
+	"time"
 
-import "github.com/nazimov1amu/alex-practicum-diploma/internal/apperrors"
+	"github.com/nazimov1amu/alex-practicum-diploma/internal/apperrors"
+	"github.com/shopspring/decimal"
+)
 
 type WithdrawRequest struct {
-	Order string  `json:"order"`
-	Sum   float64 `json:"sum"`
+	Order string          `json:"order"`
+	Sum   decimal.Decimal `json:"sum"`
 }
 
 func (r WithdrawRequest) Validate() error {
-	if r.Order == "" || r.Sum <= 0 {
+	if r.Order == "" || !r.Sum.IsPositive() {
 		return apperrors.BadRequest(invalidRequestBody)
 	}
 	if !ValidLuhn(r.Order) {
@@ -20,7 +23,7 @@ func (r WithdrawRequest) Validate() error {
 }
 
 type WithdrawalResponse struct {
-	Order       string    `json:"order"`
-	Sum         float64   `json:"sum"`
-	ProcessedAt time.Time `json:"processed_at"`
+	Order       string          `json:"order"`
+	Sum         decimal.Decimal `json:"sum"`
+	ProcessedAt time.Time       `json:"processed_at"`
 }

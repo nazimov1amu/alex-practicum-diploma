@@ -9,6 +9,7 @@ import (
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/apperrors"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/models"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/repositories"
+	"github.com/shopspring/decimal"
 	"go.uber.org/zap"
 )
 
@@ -28,7 +29,7 @@ type eventStore interface {
 
 type userBalanceStore interface {
 	GetByID(ctx context.Context, id uuid.UUID) (models.User, error)
-	AddBalance(ctx context.Context, tx *sql.Tx, userID uuid.UUID, delta float64) error
+	AddBalance(ctx context.Context, tx *sql.Tx, userID uuid.UUID, delta decimal.Decimal) error
 }
 
 func NewEventService(db *sql.DB, logger *zap.SugaredLogger, events eventStore, user userBalanceStore) *EventService {
@@ -52,7 +53,7 @@ func (s *EventService) Create(ctx context.Context, event models.Event) (models.E
 		return models.Event{}, mapRepositoryError(s.logger, err, "user")
 	}
 
-	if event.EventType == models.EventTypeWithdrawal && user.Balance < event.Amount {
+	if event.EventType == models.EventTypeWithdrawal && user.Balance.LessThan(event.Amount) {
 		return models.Event{}, apperrors.PaymentRequired(insufficientBalance)
 	}
 
@@ -83,9 +84,9 @@ func (s *EventService) ListWithdrawals(ctx context.Context, userID uuid.UUID) ([
 	return events, nil
 }
 
-func eventDelta(event models.Event) float64 {
+func eventDelta(event models.Event) decimal.Decimal {
 	if event.EventType == models.EventTypeWithdrawal {
-		return -event.Amount
+		return event.Amount.Neg()
 	}
 	return event.Amount
 }

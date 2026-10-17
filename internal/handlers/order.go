@@ -84,8 +84,9 @@ func (h *OrderHandler) list(c *echo.Context) error {
 			Status:     order.Status,
 			UploadedAt: order.CreatedAt,
 		}
-		if order.Accrual > 0 {
-			item.Accrual = &order.Accrual
+		if order.Accrual.IsPositive() {
+			accrual := order.Accrual
+			item.Accrual = &accrual
 		}
 		response = append(response, item)
 	}

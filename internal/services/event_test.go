@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/apperrors"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/models"
+	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -42,8 +43,8 @@ func (f *fakeUserBalance) GetByID(context.Context, uuid.UUID) (models.User, erro
 	return f.user, nil
 }
 
-func (f *fakeUserBalance) AddBalance(_ context.Context, _ *sql.Tx, _ uuid.UUID, delta float64) error {
-	f.user.Balance += delta
+func (f *fakeUserBalance) AddBalance(_ context.Context, _ *sql.Tx, _ uuid.UUID, delta decimal.Decimal) error {
+	f.user.Balance = f.user.Balance.Add(delta)
 	return nil
 }
 
@@ -53,12 +54,12 @@ func TestEventService_Create(t *testing.T) {
 	tests := []struct {
 		name        string
 		eventType   models.EventType
-		amount      float64
-		haveBalance float64
-		wantBalance float64
+		amount      decimal.Decimal
+		haveBalance decimal.Decimal
+		wantBalance decimal.Decimal
 	}{
-		{name: "withdrawal", eventType: models.EventTypeWithdrawal, amount: 50, haveBalance: 50, wantBalance: 0},
-		{name: "deposit", eventType: models.EventTypeDeposit, amount: 150.5, haveBalance: 0, wantBalance: 150.5},
+		{name: "withdrawal", eventType: models.EventTypeWithdrawal, amount: decimal.NewFromInt(50), haveBalance: decimal.NewFromInt(50), wantBalance: decimal.NewFromInt(0)},
+		{name: "deposit", eventType: models.EventTypeDeposit, amount: decimal.RequireFromString("150.5"), haveBalance: decimal.NewFromInt(0), wantBalance: decimal.RequireFromString("150.5")},
 	}
 
 	for _, tc := range tests {
@@ -81,7 +82,7 @@ func TestEventService_Create(t *testing.T) {
 			got, err := svc.Create(context.Background(), event)
 			require.NoError(t, err)
 			assert.Equal(t, created, got)
-			assert.Equal(t, tc.wantBalance, users.user.Balance)
+			assert.True(t, tc.wantBalance.Equal(users.user.Balance))
 		})
 	}
 }
@@ -93,7 +94,7 @@ func TestEventService_ListWithdrawals(t *testing.T) {
 		UserID:      userID,
 		OrderNumber: "2377222919",
 		EventType:   models.EventTypeWithdrawal,
-		Amount:      50,
+		Amount:      decimal.NewFromInt(50),
 	}}
 
 	t.Run("ok", func(t *testing.T) {

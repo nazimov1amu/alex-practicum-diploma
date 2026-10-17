@@ -10,6 +10,7 @@ import (
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/apperrors"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/common"
 	"github.com/nazimov1amu/alex-practicum-diploma/internal/models"
+	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -125,7 +126,7 @@ func TestUserService_Refresh_InvalidToken(t *testing.T) {
 
 func TestUserService_GetBalance(t *testing.T) {
 	userID := uuid.New()
-	stored := models.UserBalance{Current: 100.5, Withdrawn: 20}
+	stored := models.UserBalance{Current: decimal.RequireFromString("100.5"), Withdrawn: decimal.NewFromInt(20)}
 
 	t.Run("ok", func(t *testing.T) {
 		svc := newUserService(t, &fakeUserStore{balance: stored})
